@@ -1,5 +1,5 @@
 /*
- *  Face tracker 0.1
+ *  Face manager 0.1
  *
  *  Copyright (c) 2018 David Snowdon. All rights reserved.
  *
@@ -32,6 +32,17 @@ std::set<TV> extract_values(std::map<TK, TV> const &input_map) {
         retval.insert(element.second);
     }
     return retval;
+}
+
+// TODO use type traits to ensure that C is a container with the value type TV
+// https://stackoverflow.com/questions/7728478/c-template-class-function-with-arbitrary-container-type-how-to-define-it
+template<typename TK, typename TV, typename C>
+C extract_values(std::map<TK, TV> const &input_map, C &container) {
+    auto inserter = std::inserter(container, container.end());
+    for (auto const &element: input_map) {
+        inserter = element.second;
+    }
+    return container;
 }
 
 template<typename T>

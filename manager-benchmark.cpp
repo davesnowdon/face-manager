@@ -1,5 +1,5 @@
 /*
- *  Face tracker 0.1
+ *  Face manager 0.1
  *
  *  Copyright (c) 2018 David Snowdon. All rights reserved.
  *
@@ -158,7 +158,6 @@ runMethods(int numIterations, char *videoFilename, FaceDetector &faceDetector, M
                               MOTION_DIFF,
                               MOTION_DIFF_WITH_BLUR};
     for (const MotionMethod method : methods) {
-        // TODO add manager
         int result = runTrial(method, numIterations, videoFilename, false, faceDetector, manager);
         if (0 != result) {
             std::cerr << "Stopping early due to error" << std::endl;

@@ -1,6 +1,6 @@
 #! /bin/bash
 #
-# Face tracker 0.1
+# Face manager 0.1
 # Run micro benchmark suite several times and create CSV file with combined results
 #
 # Copyright (c) 2018 David Snowdon. All rights reserved.
@@ -9,7 +9,7 @@
 # file LICENSE.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 EXE='./micro-benchmarks'
-TEST_FILE=test-data/example-frame.png
+TEST_FILE=../test-data/example-frame.png
 ARCH=$(uname -p)
 RESULT_FILE="benchmark-results-${ARCH}.csv"
 TMP_FILE=$(mktemp /tmp/benchmarks.XXXXXX)

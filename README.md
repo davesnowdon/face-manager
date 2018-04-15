@@ -1,4 +1,4 @@
-# Face tracker
+# Face Manager
 
 This code is designed to monitor a video stream by being fed individual frames and track all the people present.
 
@@ -11,8 +11,16 @@ This accepts an input video and a list of known people and produces an output vi
 annotated with the current frame rate (calculated using an exponential moving average),
 the faces currently being tracked and their identities if known.
 
-    ./manager-demo test-data/movinghuman1.mp4 diff Dave face1.jpg Devlin face2.jpg
+    ./manager-demo <INPUT_VIDEO_FILE> <OUTPUT_VIDEO_FILE> <MOTION_DIFF_METHOD> [NAME1 FACE1.jpg] ... [NAME_N FACE_N.jpg]
 
+where MOTION_DIFF_METHOD can be one of:
+* ALWAYS - always "detect" motion, used for comparison
+* NEVER - never detect motion, used to allow us to see cost of reading video with no processing overhead
+* CONTOURS - Use the PyImageSearch method based on contours
+* MSE - Use mean squared error
+* MSE_WITH_BLUR - Use mean squared error after blurring
+* DIFF - use frame differencing
+* DIFF_WITH_BLUR - use frame differencing after blurring
 
 ## Benchmarks
 
@@ -20,14 +28,14 @@ the faces currently being tracked and their identities if known.
 These are intended to compare the various motion detection methods and get a feel for the
 performance improvements when using the manager compared to a naive implementation.
 
-    ./manager-benchmark test-data/movinghuman2.mp4 1
+    ./manager-benchmark <VIDEO_FILE> 1
 
 ### Micro benchmarks
 These are intended to get rough performance figures for the basic operations performed
 by the face tracking and motion detection code. The aim is to guide the implementation and
 get a feel for how expensive the various operations are on a desktop and Raspberry Pi
 
-    ./micro-benchmarks test-data/example-frame.png
+    ./micro-benchmarks <EXAMPLE_IMAGE_WITH_FACE>
 
 ## Tests
 Tests use [Catch2](https://github.com/catchorg/Catch2)

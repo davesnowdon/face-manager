@@ -1,5 +1,5 @@
 /*
- *  Face tracker 0.1
+ *  Face manager 0.1
  *
  *  Copyright (c) 2018 David Snowdon. All rights reserved.
  *

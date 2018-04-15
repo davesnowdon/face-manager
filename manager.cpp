@@ -1,5 +1,5 @@
 /*
- *  Face tracker 0.1
+ *  Face manager 0.1
  *
  *  Copyright (c) 2018 David Snowdon. All rights reserved.
  *
@@ -23,11 +23,6 @@ rectangleComparator(const dlib::rectangle &l, const dlib::rectangle &r) {
 bool
 personComparator(const std::shared_ptr<Person> &l, const std::shared_ptr<Person> &r) {
     return rectangleComparator(l->boundingBox(), r->boundingBox());
-}
-
-void
-Manager::sortActive() {
-    std::sort(visible_people_.begin(), visible_people_.end(), personComparator);
 }
 
 void
@@ -66,7 +61,7 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
             logger.debug("Number of faces detected: " +
                          std::to_string(faceRects.size()) +
                          ", current visible faces: " +
-                         std::to_string(visible_people_.size()));
+                         std::to_string(trackers_.size()));
         }
 
         // which local IDs have been matched with detected faces
@@ -142,18 +137,19 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
                  */
                 if (!is_face_matched) {
                     logger.debug("New face detected at ", face_rect);
-                    FaceDescriptor descriptor = getFaceDescriptor(frame_dlib, face_rect);
+                    FaceDescriptor descriptor = getFaceDescriptor(frame_dlib, face_rect, false);
                     auto known_person = findPerson(descriptor);
                     int new_tracker_id = 0;
                     if (!known_person) {
                         // Person we have not seen before
-                        new_tracker_id = ++last_local_id_;
+                        auto person = handleNewPerson(frame_dlib, face_rect);
+                        new_tracker_id = person->localId();
 
-                        // TODO set up new person
                     } else {
                         // Person we've seen before
                         new_tracker_id = known_person->localId();
                     }
+                    personVisible(new_tracker_id);
 
                     dlib::rectangle padded_rectangle(face_rect.left() - tracker_horizontal_margin_,
                                                      face_rect.top() - tracker_vertical_margin_,
@@ -182,9 +178,34 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
                          set_to_string(difference, ","));
         }
         for (int id : difference) {
-            trackers_.erase(id);
+            personNotVisible(id);
         }
     }
+}
+
+std::vector<std::shared_ptr<Person>>
+Manager::visiblePeople() const {
+    std::vector<std::shared_ptr<Person>> people;
+    extract_values(visible_people_, people);
+    return people;
+}
+
+// TODO implement callback to notify clients when new person visible
+void
+Manager::personVisible(int local_id) {
+    std::shared_ptr<Person> person = findPerson(local_id);
+    if (person) {
+        visible_people_[local_id] = person;
+    } else {
+        logger.error("Person with local ID " + std::to_string(local_id) + " marked as visible but not found");
+    }
+}
+
+// TODO implement callback to notify clients when person is no longer visible
+void
+Manager::personNotVisible(int local_id) {
+    trackers_.erase(local_id);
+    visible_people_.erase(local_id);
 }
 
 bool
@@ -200,7 +221,7 @@ Manager::isSameRegion(const dlib::rectangle &bb1, const dlib::rectangle &bb2) co
 // Find a person using a descriptor. Returns nullptr if no face found
 std::shared_ptr<Person>
 Manager::findPerson(const FaceDescriptor &descriptor) const {
-    for (const std::shared_ptr<Person> &person : seen_people_) {
+    for (const std::shared_ptr<Person> &person : people_) {
         if (isSamePerson(descriptor, person->faceDescriptor())) {
             return person;
         }
@@ -240,7 +261,7 @@ Manager::addPerson(const std::string &external_id, const std::string &face_filen
     person->externalId(external_id);
 
     // Remember the person so we can identify them if seen
-    seen_people_.push_back(person);
+    people_.push_back(person);
     return person;
 }
 
@@ -249,31 +270,45 @@ Manager::addPerson(const std::string &external_id, const std::string &face_filen
  * Find a person using a bounding box. Only checks for people that
  * are currently visible.
  */
-std::shared_ptr<Person>
+std::vector<std::shared_ptr<Person>>
 Manager::findPerson(dlib::rectangle &bounding_box) const {
-    for (const std::shared_ptr<Person> &person : seen_people_) {
+    std::vector<std::shared_ptr<Person>> results;
+    for (const std::shared_ptr<Person> &person : people_) {
         if (isSameRegion(bounding_box, person->boundingBox())) {
-            return person;
+            results.push_back(person);
         }
     }
-    return nullptr;
+    return results;
 }
 
 // find a person using the external ID
-std::shared_ptr<Person>
+std::vector<std::shared_ptr<Person>>
 Manager::findPerson(std::string &external_id) const {
-    for (const std::shared_ptr<Person> &person : seen_people_) {
+    std::vector<std::shared_ptr<Person>> results;
+    for (const std::shared_ptr<Person> &person : people_) {
         if (external_id == person->externalId()) {
-            return person;
+            results.push_back(person);
         }
     }
-    return nullptr;
+    return results;
 }
 
 // find a person using the local ID
 std::shared_ptr<Person>
 Manager::findPerson(int local_id) const {
-    for (const std::shared_ptr<Person> &person : seen_people_) {
+    // First check the smaller map of visible people
+    auto it = visible_people_.find(local_id);
+    if (it != visible_people_.end()) {
+        return it->second;
+    } else {
+        // then check everyone else
+        return findPersonAll(local_id);
+    }
+}
+
+std::shared_ptr<Person>
+Manager::findPersonAll(int local_id) const {
+    for (const std::shared_ptr<Person> &person : people_) {
         if (local_id == person->localId()) {
             return person;
         }
@@ -281,18 +316,10 @@ Manager::findPerson(int local_id) const {
     return nullptr;
 }
 
-void
-Manager::handleNoFacesDetected() {
-    // no faces detected increment all non-visible counts and check thresholds
-    for (const std::shared_ptr<Person> &person : visible_people_) {
-        person->incNonVisibleFrames();
-    }
-}
-
-
 FaceDescriptor
 Manager::getFaceDescriptor(const dlib::cv_image<dlib::bgr_pixel> &image,
-                           const dlib::rectangle &face_bounds) {
+                           const dlib::rectangle &face_bounds,
+                           bool use_jitter) {
     // These are the transformed and extracted faces
     dlib::matrix<dlib::rgb_pixel> face = face_detector_.extractFaceImage(image, face_bounds);
 
@@ -302,31 +329,26 @@ Manager::getFaceDescriptor(const dlib::cv_image<dlib::bgr_pixel> &image,
      * but vectors from different people will be far apart.  So we can use these vectors to
      * identify if a pair of images are from the same person or from different people.
      */
-    return face_detector_.getFaceDescriptor(face, use_jitter_);
+    return face_detector_.getFaceDescriptor(face, use_jitter);
 }
 
-void
-Manager::handleNewFaceBox(dlib::cv_image<dlib::bgr_pixel> image, dlib::rectangle &rectangle) {
+std::shared_ptr<Person>
+Manager::handleNewPerson(dlib::cv_image<dlib::bgr_pixel> image,
+                         dlib::rectangle &rectangle) {
     // These are the transformed and extracted faces
     dlib::matrix<dlib::rgb_pixel> face = face_detector_.extractFaceImage(image, rectangle);
 
     // TODO determine amount of blurriness
     double blur = 0;
 
-    /*
-     * This call asks the DNN to convert each face image in faces into a 128D vector.
-     * In this 128D vector space, images from the same person will be close to each other
-     * but vectors from different people will be far apart.  So we can use these vectors to
-     * identify if a pair of images are from the same person or from different people.
-     */
-    FaceDescriptor face_descriptor = face_detector_.getFaceDescriptor(face, use_jitter_);
+    FaceDescriptor face_descriptor = getFaceDescriptor(image, rectangle, use_jitter_);
     Image tmp_face_image; // convert from matrix to array2d
     dlib::assign_image(tmp_face_image, face);
 
     // Put person on known list and currently visible list
     auto person = makePerson(rectangle, tmp_face_image, blur, face_descriptor);
-    seen_people_.push_back(person);
-    visible_people_.push_back(person);
+    people_.push_back(person);
+    return person;
 }
 
 std::shared_ptr<Person>
@@ -335,25 +357,7 @@ Manager::makePerson(const dlib::rectangle &rectangle, const Image &face_image, d
     return std::make_shared<Person>(++last_local_id_, rectangle, face_image, blur, face_descriptor);
 }
 
-void
-Manager::purgeVisibleList() {
-    // Remove any people that have not been visible for at least max_non_visible_frames_ frames
-    int prev_visible = visible_people_.size();
-    visible_people_.erase(
-            std::remove_if(visible_people_.begin(), visible_people_.end(),
-                           [this](const std::shared_ptr<Person> &person) {
-                               return person->nonVisibleFrames() >= max_non_visible_frames_;
-                           }),
-            visible_people_.end());
-
-    if (logger.debugEnabled()) {
-        logger.debug("# people removed from visible list: " +
-                     std::to_string(prev_visible - visible_people_.size()));
-    }
-}
-
 void Manager::reset() {
     last_frame_ = 0;
-    last_local_id_ = 0;
-    visible_people_.clear();
+    trackers_.clear();
 }

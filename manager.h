@@ -1,5 +1,5 @@
 /*
- *  Face tracker 0.1
+ *  Face manager 0.1
  *
  *  Copyright (c) 2018 David Snowdon. All rights reserved.
  *
@@ -123,6 +123,8 @@ public:
      */
     void newFrame(int frame_no, cv::Mat &frame);
 
+    std::vector<std::shared_ptr<Person>> visiblePeople() const;
+
     bool isSamePerson(const FaceDescriptor &face1, const FaceDescriptor &face2) const;
 
     bool isSameRegion(const dlib::rectangle &bb1, const dlib::rectangle &bb2) const;
@@ -130,17 +132,24 @@ public:
     /*
      * Tell the manager about a new person and provide a file the face can be loaded from.
      * The supplied image must contain exactly one face of close to 150x150 pixels.
+     * TODO Also need ability to add person using already known face descriptor and pre-loaded image
      */
-    std::shared_ptr<Person> addPerson(const std::string& external_id, const std::string& face_filename);
+    std::shared_ptr<Person> addPerson(const std::string &external_id, const std::string &face_filename);
 
     // Find a person using a descriptor. Returns nullptr if no face found
     std::shared_ptr<Person> findPerson(const FaceDescriptor &descriptor) const;
 
-    // Find a person using a bounding box
-    std::shared_ptr<Person> findPerson(dlib::rectangle &bounding_box) const;
+    /*
+     * Find a person using a bounding box
+     * Returns a list since there may be multiple people overlapping the bounding box
+     */
+    std::vector<std::shared_ptr<Person>> findPerson(dlib::rectangle &bounding_box) const;
 
-    // find a person using the external ID
-    std::shared_ptr<Person> findPerson(std::string &external_id) const;
+    /*
+     * find a person using the external ID.
+     * Can't guarantee that external names are unique since we don't control them so may return multiple matches.
+     */
+    std::vector<std::shared_ptr<Person>> findPerson(std::string &external_id) const;
 
     // find a person using the local ID
     std::shared_ptr<Person> findPerson(int local_id) const;
@@ -148,34 +157,39 @@ public:
     void reset();
 
 private:
+    void personVisible(int local_id);
+
+    void personNotVisible(int local_id);
+
     /*
-     * Ensure that active list is sorted by bounding box
+     * Compute a face descriptor from a face rectangle. Using jitter will compute a mean
+     * of multiple perturbed versions of the image (minor changes in position, rotation and left/rigth flip)
+     * which may give better recognition results but which is slower so we probably don't
+     * want to do this every time we are testing a potentially unknown face.
      */
-    void sortActive();
-
-    void handleNoFacesDetected();
-
     FaceDescriptor getFaceDescriptor(const dlib::cv_image<dlib::bgr_pixel> &image,
-                                              const dlib::rectangle &face_bounds);
+                                     const dlib::rectangle &face_bounds,
+                                     bool use_jitter);
 
-    void handleNewFaceBox(dlib::cv_image<dlib::bgr_pixel> image, dlib::rectangle &rectangle);
+    std::shared_ptr<Person> handleNewPerson(dlib::cv_image<dlib::bgr_pixel> image,
+                                            dlib::rectangle &rectangle);
 
-    std::shared_ptr<Person> makePerson(const dlib::rectangle &rectangle, const Image& face_image, double blur,
-                                       const FaceDescriptor& face_descriptor);
+    std::shared_ptr<Person> makePerson(const dlib::rectangle &rectangle, const Image &face_image, double blur,
+                                       const FaceDescriptor &face_descriptor);
 
-    void purgeVisibleList();
+    std::shared_ptr<Person> findPersonAll(int local_id) const;
 
     // Handles detecting and recognising faces
     FaceDetector &face_detector_;
 
-    // People who've been this this session. This "owns" the Person instances
-    std::vector<std::shared_ptr<Person>> seen_people_;
+    // People who are known to the system. This "owns" the Person instances
+    std::vector<std::shared_ptr<Person>> people_;
 
-    // People who are currently visible. Sorted by bounding box
-    std::vector<std::shared_ptr<Person>> visible_people_;
-
-    // Map local ID to the track currently tracking the object with this ID
+    // Map local ID to the tracker currently tracking the object with this ID
     std::map<int, std::unique_ptr<dlib::correlation_tracker>> trackers_;
+
+    // Map local ID to the person object. Used to maintain easy access to the people currently visible
+    std::map<int, std::shared_ptr<Person>> visible_people_;
 
     int last_frame_ = 0;
 
@@ -189,10 +203,6 @@ private:
     // Minimum Intersection over Union (IoU) value to treat bounding boxes as the same
     // TODO The slower the frame rate the lower the bounding box threshold needs to be as faces could have moved further between frames
     float bounding_box_threshold_ = 0.5;
-
-    // Max number of frames a face can be not visible before being moved off visible list
-    // (we don't want to stop tracking a face if it is only briefly occluded)
-    int max_non_visible_frames_ = 2;
 
     double min_tracker_confidence_ = 7;
 
