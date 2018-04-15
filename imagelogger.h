@@ -128,7 +128,7 @@ public:
     }
 
     inline void log(int msgLevel, std::string msg, dlib::rectangle& rect) {
-        log(L_ERROR, msg + " rect: " + to_string(rect));
+        log(msgLevel, msg + " rect: " + to_string(rect));
     }
 
 private:

@@ -93,7 +93,7 @@ ImageLogger::levelString(int msgLevel) const {
         case L_DEBUG:
             return " DEBUG ";
         case L_INFO:
-            return " INFO ";
+            return " INFO  ";
         case L_ERROR:
             return " ERROR ";
         default:
