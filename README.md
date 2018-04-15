@@ -52,3 +52,6 @@ This code is licensed under the [Boost 1.0 license](http://www.boost.org/users/l
 
 ## Thanks
 * Many thanks to [Davis King](https://github.com/davisking) ([@nulhom](https://twitter.com/nulhom)) for creating [dlib](http://dlib.net/) and for providing the trained facial feature detection and face encoding models used in this library. For more information on the ResNet that powers the face encodings, check out his [blog post](http://blog.dlib.net/2017/02/high-quality-face-recognition-with-deep.html).
+
+## Background
+This code was originally written as the final project for Satya Mallick's [Computer Vision for Faces](https://courses.learnopencv.com/p/computer-vision-for-faces) course. My intent is to continue to develop it into a useful package to support human interaction with IoT devices and robots.
