@@ -25,15 +25,15 @@ ImageLogger::ImageLogger(std::string dir) {
 }
 
 ImageLogger::~ImageLogger() {
-   if (logFile) {
-       logFile.close();
-   }
+    if (logFile) {
+        logFile.close();
+    }
 }
 
 void
-ImageLogger::log(int msgLevel, std::string step, const cv::Mat& image) {
+ImageLogger::log(int msgLevel, std::string step, const cv::Mat &image) {
     if (enabled && (msgLevel >= logLevel)) {
-        if (0 == seq) {
+        if (!logFile.is_open()) {
             firstLog();
         }
         cv::imwrite(filename(step), image);
@@ -42,9 +42,9 @@ ImageLogger::log(int msgLevel, std::string step, const cv::Mat& image) {
 }
 
 void
-ImageLogger::log(int msgLevel, std::string step, const dlib::matrix<dlib::rgb_pixel>& dlib_image) {
+ImageLogger::log(int msgLevel, std::string step, const dlib::matrix<dlib::rgb_pixel> &dlib_image) {
     if (enabled && (msgLevel >= logLevel)) {
-        if (0 == seq) {
+        if (!logFile.is_open()) {
             firstLog();
         }
         dlib::save_png(dlib_image, filename(step));
@@ -55,10 +55,10 @@ ImageLogger::log(int msgLevel, std::string step, const dlib::matrix<dlib::rgb_pi
 void
 ImageLogger::log(int msgLevel, std::string msg) {
     if (enabled && (msgLevel >= logLevel)) {
-        if (0 == seq) {
+        if (!logFile.is_open()) {
             firstLog();
         }
-        logFile << msg << std::endl;
+        logFile << frameString() << levelString(msgLevel) << msg << std::endl;
     }
 }
 
@@ -67,6 +67,9 @@ ImageLogger::firstLog() {
     if (enabled) {
         mkpath(dirName.c_str(), 0777);
         logFile.open(imagePrefix + DEFAULT_LOG_NAME);
+        if (!logFile.is_open()) {
+            std::cerr << "Failed to open " << (imagePrefix + DEFAULT_LOG_NAME) << std::endl;
+        }
     }
 }
 
@@ -82,5 +85,19 @@ ImageLogger::frameString() {
     return std::string(numbers);
 }
 
-
+std::string
+ImageLogger::levelString(int msgLevel) const {
+    switch (msgLevel) {
+        case L_TRACE:
+            return " TRACE ";
+        case L_DEBUG:
+            return " DEBUG ";
+        case L_INFO:
+            return " INFO ";
+        case L_ERROR:
+            return " ERROR ";
+        default:
+            return " UNKNOWN ";
+    }
+}
 

@@ -8,6 +8,7 @@
  */
 
 #include <cmath>
+#include <iomanip>
 
 #include "imagelogger.h"
 #include "facedetector.h"
@@ -22,9 +23,14 @@ const double FPS_TEXT_SCALE = 0.75;
 const cv::Scalar FPS_TEXT_COLOUR(255, 128, 0);
 const int FPS_TEXT_THICKNESS = 2;
 const char *FPS_TEXT_PREFIX = "FPS: ";
+const int FPS_WIDTH = 5;
+const int FPS_PRECISION = 3;
 
-const cv::Point PERSON_COUNT_POSITION(20, 40);
-const char *PERSON_COUNT_PREFIX = "#people: ";
+const char *VISIBLE_COUNT_PREFIX = ", #visible: ";
+const int VISIBLE_COUNT_WIDTH = 2;
+const char *KNOWN_COUNT_PREFIX = ", #people: ";
+const int KNOWN_COUNT_WIDTH = 2;
+
 
 const char *PERSON_UNKNOWN_PREFIX = "Local ID: ";
 const cv::Scalar PERSON_NAME_COLOUR(255, 0, 0);
@@ -58,6 +64,7 @@ int main(int argc, char **argv) {
         usage();
         return EXIT_FAILURE;
     }
+    logger.setFrame(0);
     logger.enable(true);
 
     char *inputVideoFilename = argv[1];
@@ -156,16 +163,13 @@ int main(int argc, char **argv) {
                         (1.0 - FPS_MOVING_AVERAGE_WEIGHT) * thisFrame;
         double fps = cv::getTickFrequency() / meanFrameTime;
 
-        // Display frames per second
+        // Display frames per second and other info
         std::stringstream fpsText;
-        fpsText << FPS_TEXT_PREFIX << fps;
+        fpsText << std::setprecision(FPS_PRECISION)
+                << FPS_TEXT_PREFIX << std::setw(FPS_WIDTH) << fps
+                << VISIBLE_COUNT_PREFIX << std::setw(VISIBLE_COUNT_WIDTH) << manager->visibleCount()
+                << KNOWN_COUNT_PREFIX << std::setw(KNOWN_COUNT_WIDTH) << manager->knownCount();
         cv::putText(frame, fpsText.str(), FPS_TEXT_POSITION, FPS_TEXT_FONT, FPS_TEXT_SCALE, FPS_TEXT_COLOUR,
-                    FPS_TEXT_THICKNESS);
-
-        // Display current person count
-        std::stringstream countStream;
-        countStream << PERSON_COUNT_PREFIX << visible_people.size();
-        cv::putText(frame, countStream.str(), PERSON_COUNT_POSITION, FPS_TEXT_FONT, FPS_TEXT_SCALE, FPS_TEXT_COLOUR,
                     FPS_TEXT_THICKNESS);
 
         output_video.write(frame);

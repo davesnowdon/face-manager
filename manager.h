@@ -27,7 +27,7 @@ public:
 
     Person(int id, const dlib::rectangle &bounding_box, const Image &face_image, double blur,
            const FaceDescriptor &descriptor)
-            : local_id_(local_id_), bounding_box_(bounding_box), face_blur_(blur), face_descriptor_(descriptor) {
+            : local_id_(id), bounding_box_(bounding_box), face_blur_(blur), face_descriptor_(descriptor) {
         dlib::assign_image(face_image_, face_image);
     }
 
@@ -124,6 +124,10 @@ public:
     void newFrame(int frame_no, cv::Mat &frame);
 
     std::vector<std::shared_ptr<Person>> visiblePeople() const;
+
+    int visibleCount() const;
+
+    int knownCount() const;
 
     bool isSamePerson(const FaceDescriptor &face1, const FaceDescriptor &face2) const;
 

@@ -33,6 +33,8 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
     std::vector<int> low_confidence_trackers;
     for (auto it = trackers_.begin(); it != trackers_.end(); ++it) {
         double confidence = it->second->update(frame_dlib);
+        auto tracked_person = findPerson(it->first);
+        tracked_person->boundingBox(it->second->get_position());
         if (logger.debugEnabled()) {
             logger.debug(
                     "Tracker for : " + std::to_string(it->first) + " has confidence " + std::to_string(confidence));
@@ -150,6 +152,7 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
                         new_tracker_id = known_person->localId();
                     }
                     personVisible(new_tracker_id);
+                    matched_ids.insert(new_tracker_id);
 
                     dlib::rectangle padded_rectangle(face_rect.left() - tracker_horizontal_margin_,
                                                      face_rect.top() - tracker_vertical_margin_,
@@ -208,6 +211,16 @@ Manager::personNotVisible(int local_id) {
     visible_people_.erase(local_id);
 }
 
+int
+Manager::visibleCount() const {
+    return visible_people_.size();
+}
+
+int
+Manager::knownCount() const {
+    return people_.size();
+}
+
 bool
 Manager::isSamePerson(const FaceDescriptor &face1, const FaceDescriptor &face2) const {
     return dlib::length(face1 - face2) < descriptor_threshold_;
@@ -231,6 +244,7 @@ Manager::findPerson(const FaceDescriptor &descriptor) const {
 
 std::shared_ptr<Person>
 Manager::addPerson(const std::string &external_id, const std::string &face_filename) {
+    logger.debug("Add person " + external_id + " with file " + face_filename);
 
     // load image from file
     dlib::array2d<dlib::rgb_pixel> img;
@@ -239,6 +253,8 @@ Manager::addPerson(const std::string &external_id, const std::string &face_filen
     // check that a single face can be detected
     std::vector<dlib::rectangle> face_bbs = face_detector_.detectFaces(img);
     if (1 != face_bbs.size()) {
+        logger.error(std::to_string(face_bbs.size()) + " faces detected for " +
+                     external_id + " in file " + face_filename + " needed 1");
         // TODO raise exception
         return nullptr;
     }

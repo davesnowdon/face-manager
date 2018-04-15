@@ -128,13 +128,14 @@ public:
     }
 
     inline void log(int msgLevel, std::string msg, dlib::rectangle& rect) {
-        log(L_ERROR, msg + to_string(rect));
+        log(L_ERROR, msg + " rect: " + to_string(rect));
     }
 
 private:
     void firstLog();
     std::string filename(std::string step);
     std::string frameString();
+    std::string levelString(int msgLevel) const;
 
     bool enabled = true;
     int logLevel = L_DEBUG;
