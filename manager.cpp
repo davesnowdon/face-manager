@@ -189,7 +189,12 @@ Manager::newFrame(int frame_no, cv::Mat &frame) {
 std::vector<std::shared_ptr<Person>>
 Manager::visiblePeople() const {
     std::vector<std::shared_ptr<Person>> people;
-    extract_values(visible_people_, people);
+    for (auto it = trackers_.begin(); it != trackers_.end(); ++it) {
+        auto person = findPerson(it->first);
+        if (person) {
+            people.push_back(person);
+        }
+    }
     return people;
 }
 
@@ -197,9 +202,7 @@ Manager::visiblePeople() const {
 void
 Manager::personVisible(int local_id) {
     std::shared_ptr<Person> person = findPerson(local_id);
-    if (person) {
-        visible_people_[local_id] = person;
-    } else {
+    if (!person) {
         logger.error("Person with local ID " + std::to_string(local_id) + " marked as visible but not found");
     }
 }
@@ -208,12 +211,11 @@ Manager::personVisible(int local_id) {
 void
 Manager::personNotVisible(int local_id) {
     trackers_.erase(local_id);
-    visible_people_.erase(local_id);
 }
 
 int
 Manager::visibleCount() const {
-    return visible_people_.size();
+    return trackers_.size();
 }
 
 int
@@ -234,9 +236,9 @@ Manager::isSameRegion(const dlib::rectangle &bb1, const dlib::rectangle &bb2) co
 // Find a person using a descriptor. Returns nullptr if no face found
 std::shared_ptr<Person>
 Manager::findPerson(const FaceDescriptor &descriptor) const {
-    for (const std::shared_ptr<Person> &person : people_) {
-        if (isSamePerson(descriptor, person->faceDescriptor())) {
-            return person;
+    for (const  auto item : people_) {
+        if (isSamePerson(descriptor, item.second->faceDescriptor())) {
+            return item.second;
         }
     }
     return nullptr;
@@ -277,7 +279,7 @@ Manager::addPerson(const std::string &external_id, const std::string &face_filen
     person->externalId(external_id);
 
     // Remember the person so we can identify them if seen
-    people_.push_back(person);
+    people_[person->localId()] = person;
     return person;
 }
 
@@ -289,9 +291,9 @@ Manager::addPerson(const std::string &external_id, const std::string &face_filen
 std::vector<std::shared_ptr<Person>>
 Manager::findPerson(dlib::rectangle &bounding_box) const {
     std::vector<std::shared_ptr<Person>> results;
-    for (const std::shared_ptr<Person> &person : people_) {
-        if (isSameRegion(bounding_box, person->boundingBox())) {
-            results.push_back(person);
+    for (const auto item : people_) {
+        if (isSameRegion(bounding_box, item.second->boundingBox())) {
+            results.push_back(item.second);
         }
     }
     return results;
@@ -301,9 +303,9 @@ Manager::findPerson(dlib::rectangle &bounding_box) const {
 std::vector<std::shared_ptr<Person>>
 Manager::findPerson(std::string &external_id) const {
     std::vector<std::shared_ptr<Person>> results;
-    for (const std::shared_ptr<Person> &person : people_) {
-        if (external_id == person->externalId()) {
-            results.push_back(person);
+    for (const auto item : people_) {
+        if (external_id == item.second->externalId()) {
+            results.push_back(item.second);
         }
     }
     return results;
@@ -313,23 +315,12 @@ Manager::findPerson(std::string &external_id) const {
 std::shared_ptr<Person>
 Manager::findPerson(int local_id) const {
     // First check the smaller map of visible people
-    auto it = visible_people_.find(local_id);
-    if (it != visible_people_.end()) {
+    auto it = people_.find(local_id);
+    if (it != people_.end()) {
         return it->second;
     } else {
-        // then check everyone else
-        return findPersonAll(local_id);
+        return nullptr;
     }
-}
-
-std::shared_ptr<Person>
-Manager::findPersonAll(int local_id) const {
-    for (const std::shared_ptr<Person> &person : people_) {
-        if (local_id == person->localId()) {
-            return person;
-        }
-    }
-    return nullptr;
 }
 
 FaceDescriptor
@@ -363,7 +354,7 @@ Manager::handleNewPerson(dlib::cv_image<dlib::bgr_pixel> image,
 
     // Put person on known list and currently visible list
     auto person = makePerson(rectangle, tmp_face_image, blur, face_descriptor);
-    people_.push_back(person);
+    people_[person->localId()] = person;
     return person;
 }
 

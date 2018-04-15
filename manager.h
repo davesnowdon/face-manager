@@ -181,19 +181,14 @@ private:
     std::shared_ptr<Person> makePerson(const dlib::rectangle &rectangle, const Image &face_image, double blur,
                                        const FaceDescriptor &face_descriptor);
 
-    std::shared_ptr<Person> findPersonAll(int local_id) const;
-
     // Handles detecting and recognising faces
     FaceDetector &face_detector_;
 
     // People who are known to the system. This "owns" the Person instances
-    std::vector<std::shared_ptr<Person>> people_;
+    std::map<int, std::shared_ptr<Person>> people_;
 
     // Map local ID to the tracker currently tracking the object with this ID
     std::map<int, std::unique_ptr<dlib::correlation_tracker>> trackers_;
-
-    // Map local ID to the person object. Used to maintain easy access to the people currently visible
-    std::map<int, std::shared_ptr<Person>> visible_people_;
 
     int last_frame_ = 0;
 
