@@ -12,6 +12,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <dlib/opencv.h>
+#include <dlib/dnn.h>
 #include <dlib/image_processing/frontal_face_detector.h>
 
 int const TEST_ITERATIONS = 10000;
@@ -34,6 +35,50 @@ double const MOTION_ACCUMULATOR_WEIGHT = 0.5;
 
 dlib::frontal_face_detector face_detector = dlib::get_frontal_face_detector();
 
+dlib::shape_predictor landmark_detector;
+
+// From dnn_face_recognition_ex.cpp
+// ----------------------------------------------------------------------------------------
+
+// The next bit of code defines a ResNet network.  It's basically copied
+// and pasted from the dnn_imagenet_ex.cpp example, except we replaced the loss
+// layer with loss_metric and made the network somewhat smaller.  Go read the introductory
+// dlib DNN examples to learn what all this stuff means.
+//
+// Also, the dnn_metric_learning_on_images_ex.cpp example shows how to train this network.
+// The dlib_face_recognition_resnet_model_v1 model used by this example was trained using
+// essentially the code shown in dnn_metric_learning_on_images_ex.cpp except the
+// mini-batches were made larger (35x15 instead of 5x5), the iterations without progress
+// was set to 10000, and the training dataset consisted of about 3 million images instead of
+// 55.  Also, the input layer was locked to images of size 150.
+template<template<int, template<typename> class, int, typename> class block, int N,
+        template<typename> class BN, typename SUBNET>
+using residual = dlib::add_prev1<block<N, BN, 1, dlib::tag1<SUBNET>>>;
+
+template<template<int, template<typename> class, int, typename> class block, int N,
+        template<typename> class BN, typename SUBNET>
+using residual_down = dlib::add_prev2<dlib::avg_pool<2, 2, 2, 2, dlib::skip1<dlib::tag2<block<N, BN, 2, dlib::tag1<SUBNET>>>>>>;
+
+template<int N, template<typename> class BN, int stride, typename SUBNET>
+using block  = BN<dlib::con<N, 3, 3, 1, 1, dlib::relu<BN<dlib::con<N, 3, 3, stride, stride, SUBNET>>>>>;
+
+template<int N, typename SUBNET> using ares      = dlib::relu<residual<block, N, dlib::affine, SUBNET>>;
+template<int N, typename SUBNET> using ares_down = dlib::relu<residual_down<block, N, dlib::affine, SUBNET>>;
+
+template<typename SUBNET> using alevel0 = ares_down<256, SUBNET>;
+template<typename SUBNET> using alevel1 = ares<256, ares<256, ares_down<256, SUBNET>>>;
+template<typename SUBNET> using alevel2 = ares<128, ares<128, ares_down<128, SUBNET>>>;
+template<typename SUBNET> using alevel3 = ares<64, ares<64, ares<64, ares_down<64, SUBNET>>>>;
+template<typename SUBNET> using alevel4 = ares<32, ares<32, ares<32, SUBNET>>>;
+
+using anet_type = dlib::loss_metric<dlib::fc_no_bias<128, dlib::avg_pool_everything<
+        alevel0<alevel1<alevel2<alevel3<alevel4<dlib::max_pool<3, 3, 2, 2, dlib::relu<dlib::affine<dlib::con<32, 7, 7, 2, 2,
+                dlib::input_rgb_image_sized<150>
+        >>>>>>>>>>>>;
+
+// DNN used for face recognition
+anet_type face_metrics_net;
+
 cv::Mat example_image;
 
 cv::Mat example_small_image;
@@ -55,6 +100,30 @@ dlib::cv_image<dlib::bgr_pixel> example_dlib;
 dlib::cv_image<dlib::bgr_pixel> example_small_dlib;
 
 cv::Mat result_image;
+
+dlib::rectangle face_bounds_large;
+
+dlib::rectangle face_bounds_small;
+
+dlib::full_object_detection landmarks_large;
+
+dlib::full_object_detection landmarks_small;
+
+dlib::matrix<float, 0, 1> face_descriptor_result;
+
+dlib::full_object_detection landmarks_result;
+
+dlib::matrix<dlib::rgb_pixel> face_chip_result;
+
+dlib::matrix<dlib::rgb_pixel> face_image;
+
+std::vector<dlib::matrix<dlib::rgb_pixel>> face_images;
+
+dlib::correlation_tracker tracker_large;
+
+dlib::correlation_tracker tracker_small;
+
+double tracker_confidence_result;
 
 // check cost of call via function pointer
 void no_op() {
@@ -192,6 +261,36 @@ void detect_faces_small() {
     std::vector<dlib::rectangle> faceRects = face_detector(example_small_dlib);
 }
 
+void face_landmarks_large() {
+    landmarks_result = landmark_detector(example_dlib, face_bounds_large);
+}
+
+void face_landmarks_small() {
+    landmarks_result = landmark_detector(example_small_dlib, face_bounds_small);
+}
+
+void extract_face_chip_large() {
+    dlib::extract_image_chip(example_dlib, dlib::get_face_chip_details(landmarks_large, 150, 0.25), face_chip_result);
+}
+
+void extract_face_chip_small() {
+    dlib::extract_image_chip(example_small_dlib, dlib::get_face_chip_details(landmarks_small, 150, 0.25), face_chip_result);
+}
+
+// face descriptors are always computed on the same size image
+void compute_face_descriptor() {
+    auto descriptors = face_metrics_net(face_images);
+    face_descriptor_result = descriptors[0];
+}
+
+void correlation_tracker_update_large() {
+    tracker_confidence_result = tracker_large.update(example_dlib);
+}
+
+void correlation_tracker_update_small() {
+    tracker_confidence_result = tracker_small.update(example_small_dlib);
+}
+
 /*
  * Time an operation specified via a function pointer. 
  * We assume that that the time taken to call the function whilst non-zero is small enough to 
@@ -217,6 +316,12 @@ int main(int argc, char **argv) {
     char *example_frame = argv[1];
     std::cout << "using " << example_frame << " as test image" << std::endl;
 
+    // facial landmark detector
+    dlib::deserialize("models/shape_predictor_5_face_landmarks.dat") >> landmark_detector;
+
+    // DNN used for face recognition
+    dlib::deserialize("models/dlib_face_recognition_resnet_model_v1.dat") >> face_metrics_net;
+
     /*
      * Setup test data
      */
@@ -235,13 +340,51 @@ int main(int argc, char **argv) {
     example_greyscale.convertTo(accumulator, CV_32FC1);
     example_small_greyscale.convertTo(accumulator_small, CV_32FC1);
 
-    dlib::cv_image<dlib::bgr_pixel> example_dlib(example_image);
-    dlib::cv_image<dlib::bgr_pixel> example_small_dlib(example_small_image);
+    dlib::cv_image<dlib::bgr_pixel> tmp_dlib(example_image);
+    example_dlib = tmp_dlib;
+    dlib::cv_image<dlib::bgr_pixel> tmp_small_dlib(example_small_image);
+    example_small_dlib = tmp_small_dlib;
+
+    std::vector<dlib::rectangle> faceRectsLarge = face_detector(example_dlib);
+    if (0 == faceRectsLarge.size()) {
+        std::cerr << "Example image must contain at least one face" << std::endl;
+        return 1;
+    }
+    face_bounds_large = faceRectsLarge[0];
+
+    bool do_small_face_tests = true;
+    std::vector<dlib::rectangle> faceRectsSmall = face_detector(example_small_dlib);
+    if (0 == faceRectsSmall.size()) {
+        std::cerr << "Can't find face in small images, skipping tests" << std::endl;
+        do_small_face_tests = false;
+    } else {
+        face_bounds_small = faceRectsSmall[0];
+    }
+
+    landmarks_large = landmark_detector(example_dlib, face_bounds_large);
+
+    dlib::extract_image_chip(example_dlib, dlib::get_face_chip_details(landmarks_large, 150, 0.25), face_image);
+    face_images.push_back(face_image);
+
+    dlib::rectangle padded_rectangle_large(face_bounds_large.left() - 10,
+                                     face_bounds_large.top() - 20,
+                                     face_bounds_large.right() + 10,
+                                     face_bounds_large.bottom() + 20);
+    tracker_large.start_track(example_dlib, padded_rectangle_large);
+
+    if (do_small_face_tests) {
+        landmarks_small = landmark_detector(example_small_dlib, face_bounds_small);
+
+        dlib::rectangle padded_rectangle_small(face_bounds_small.left() - 10,
+                                               face_bounds_small.top() - 20,
+                                               face_bounds_small.right() + 10,
+                                               face_bounds_small.bottom() + 20);
+        tracker_small.start_track(example_small_dlib, padded_rectangle_small);
+    }
 
     std::cout << "Size " << example_image.cols << "x" << example_image.rows << std::endl;
     std::cout << "Small size " << example_small_image.cols << "x" << example_small_image.rows << std::endl;
     std::cout << "Testing with " << TEST_ITERATIONS << " iterations" << std::endl;
-
 
     /*
      * Run benchmarks
@@ -276,4 +419,24 @@ int main(int argc, char **argv) {
     timer(convert_dlib_small, "Convert image to dlib (small)");
     timer(detect_faces_large, "Detect faces (large)");
     timer(detect_faces_small, "Detect faces (small)");
+    timer(face_landmarks_large, "Face landmarks (large)");
+    if (do_small_face_tests) {
+        timer(face_landmarks_small, "Face landmarks (small)");
+    }
+    timer(extract_face_chip_large, "Extract face chip (large)");
+    if (do_small_face_tests) {
+        timer(extract_face_chip_small, "Extract face chip (small)");
+    }
+    timer(compute_face_descriptor, "Compute face descriptor");
+
+    /*
+     * These only time a single frame update so they are not great overall tests of tracker
+     * performance.
+     */
+    timer(correlation_tracker_update_large, "dlib correlation tracker update (large)");
+    if (do_small_face_tests) {
+        timer(correlation_tracker_update_small, "dlib correlation tracker update (small)");
+    }
+
+    return 0;
 }
