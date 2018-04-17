@@ -9,9 +9,11 @@
 # file LICENSE.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 EXE='./micro-benchmarks'
-TEST_FILE=../test-data/example-frame.png
+#TEST_FILE=../test-data/example-frame.png
+TEST_FILE=${1:-../test-data/multi-face-devlin-face-1296x972.jpg}
+TEST_FILE_SIZE=$(identify -format '%wx%h' ${TEST_FILE})
 ARCH=$(uname -p)
-RESULT_FILE="benchmark-results-${ARCH}.csv"
+RESULT_FILE="benchmark-results-${ARCH}-${TEST_FILE_SIZE}.csv"
 TMP_FILE=$(mktemp /tmp/benchmarks.XXXXXX)
 echo $TMP_FILE
 
