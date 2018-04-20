@@ -125,7 +125,11 @@ int main(int argc, char **argv) {
     }
 
     double meanFrameTime = 0;
-    double lastFrame = (double) cv::getTickCount();
+    double minFps = std::numeric_limits<double>::max();
+    double maxFps = 0;
+    double startTicks = (double) cv::getTickCount();
+    double lastFrame = startTicks;
+
     while (input_video.read(frame)) {
         ++frameCount;
         logger.nextFrame();
@@ -162,6 +166,8 @@ int main(int argc, char **argv) {
         meanFrameTime = (FPS_MOVING_AVERAGE_WEIGHT * biasCorrectedMeanFrameTime) +
                         (1.0 - FPS_MOVING_AVERAGE_WEIGHT) * thisFrame;
         double fps = cv::getTickFrequency() / meanFrameTime;
+        minFps = std::min(minFps, fps);
+        maxFps = std::max(maxFps, fps);
 
         // Display frames per second and other info
         std::stringstream fpsText;
@@ -175,8 +181,15 @@ int main(int argc, char **argv) {
         output_video.write(frame);
     }
 
+    double endTicks = (double) cv::getTickCount();
+    double durationTicks = endTicks - startTicks;
+    double meanTicks = durationTicks / frameCount;
+    double meanFps = cv::getTickFrequency() / meanTicks;
+
     input_video.release();
     output_video.release();
+
+    std::cout << "Mean FPS " << meanFps << ", Min FPS " << minFps << ", Max FPS " << maxFps << std::endl;
 
     return EXIT_SUCCESS;
 }
