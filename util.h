@@ -15,6 +15,9 @@
 #include <string>
 #include <sstream>
 
+#include <opencv2/opencv.hpp>
+#include <dlib/opencv.h>
+
 // adapted from http://www.lonecpluspluscoder.com/2015/08/13/an-elegant-way-to-extract-keys-from-a-c-map/
 template<typename TK, typename TV>
 std::set<TK> extract_keys(std::map<TK, TV> const &input_map) {
@@ -52,6 +55,17 @@ std::string set_to_string(std::set<T> const &input, std::string const &separator
         oss << val << separator;
     }
     return oss.str();
+}
+
+/*
+ * Rectangle conversion functions from https://stackoverflow.com/questions/34871740/convert-opencvs-rect-to-dlibs-rectangle
+ */
+static cv::Rect dlibRectangleToOpenCV(dlib::rectangle r) {
+    return cv::Rect(cv::Point2i(r.left(), r.top()), cv::Point2i(r.right() + 1, r.bottom() + 1));
+}
+
+static dlib::rectangle openCVRectToDlib(cv::Rect r) {
+    return dlib::rectangle((long) r.tl().x, (long) r.tl().y, (long) r.br().x - 1, (long) r.br().y - 1);
 }
 
 #endif //FACE_MANAGER_UTIL_H

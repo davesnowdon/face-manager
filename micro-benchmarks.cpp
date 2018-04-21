@@ -11,10 +11,13 @@
 #include <cstring>
 #include <opencv2/opencv.hpp>
 #include <opencv2/objdetect.hpp>
+#include <opencv2/tracking.hpp>
 
 #include <dlib/opencv.h>
 #include <dlib/dnn.h>
 #include <dlib/image_processing/frontal_face_detector.h>
+
+#include "util.h"
 
 int const TEST_ITERATIONS = 10000;
 int const TEST_IMAGE_WIDTH = 500;
@@ -129,6 +132,18 @@ double tracker_confidence_result;
 cv::CascadeClassifier faceCascade;
 
 std::vector<cv::Rect> faces_result;
+
+cv::Ptr<cv::Tracker> kcf_tracker_large = cv::TrackerKCF::create();
+
+cv::Ptr<cv::Tracker> kcf_tracker_small = cv::TrackerKCF::create();
+
+cv::Ptr<cv::Tracker> medianflow_tracker_large = cv::TrackerMedianFlow::create();
+
+cv::Ptr<cv::Tracker> medianflow_tracker_small = cv::TrackerMedianFlow::create();
+
+cv::Rect opencv_tracker_roi_large;
+
+cv::Rect opencv_tracker_roi_small;
 
 // check cost of call via function pointer
 void no_op() {
@@ -297,7 +312,8 @@ void extract_face_chip_large() {
 }
 
 void extract_face_chip_small() {
-    dlib::extract_image_chip(example_small_dlib, dlib::get_face_chip_details(landmarks_small, 150, 0.25), face_chip_result);
+    dlib::extract_image_chip(example_small_dlib, dlib::get_face_chip_details(landmarks_small, 150, 0.25),
+                             face_chip_result);
 }
 
 // face descriptors are always computed on the same size image
@@ -312,6 +328,22 @@ void correlation_tracker_update_large() {
 
 void correlation_tracker_update_small() {
     tracker_confidence_result = tracker_small.update(example_small_dlib);
+}
+
+void opencv_kcf_tracker_update_large() {
+    kcf_tracker_large->update(example_image, opencv_tracker_roi_large);
+}
+
+void opencv_kcf_tracker_update_small() {
+    kcf_tracker_small->update(example_image, opencv_tracker_roi_small);
+}
+
+void opencv_medianflow_tracker_update_large() {
+    medianflow_tracker_large->update(example_image, opencv_tracker_roi_large);
+}
+
+void opencv_medianflow_tracker_update_small() {
+    medianflow_tracker_small->update(example_image, opencv_tracker_roi_small);
 }
 
 /*
@@ -397,12 +429,19 @@ int main(int argc, char **argv) {
     dlib::extract_image_chip(example_dlib, dlib::get_face_chip_details(landmarks_large, 150, 0.25), face_image);
     face_images.push_back(face_image);
 
+    // dlib tracker setup
     dlib::rectangle padded_rectangle_large(face_bounds_large.left() - 10,
-                                     face_bounds_large.top() - 20,
-                                     face_bounds_large.right() + 10,
-                                     face_bounds_large.bottom() + 20);
+                                           face_bounds_large.top() - 20,
+                                           face_bounds_large.right() + 10,
+                                           face_bounds_large.bottom() + 20);
     tracker_large.start_track(example_dlib, padded_rectangle_large);
 
+    // OpenCV tracker setup
+    opencv_tracker_roi_large = dlibRectangleToOpenCV(padded_rectangle_large);
+    kcf_tracker_large->init(example_image, opencv_tracker_roi_large);
+    medianflow_tracker_large->init(example_image, opencv_tracker_roi_large);
+
+    // small image test setup if applicable
     if (do_small_face_tests) {
         landmarks_small = landmark_detector(example_small_dlib, face_bounds_small);
 
@@ -411,6 +450,10 @@ int main(int argc, char **argv) {
                                                face_bounds_small.right() + 10,
                                                face_bounds_small.bottom() + 20);
         tracker_small.start_track(example_small_dlib, padded_rectangle_small);
+
+        opencv_tracker_roi_small = dlibRectangleToOpenCV(padded_rectangle_small);
+        kcf_tracker_small->init(example_image, opencv_tracker_roi_small);
+        medianflow_tracker_small->init(example_image, opencv_tracker_roi_small);
     }
 
     std::cout << "Size " << example_image.cols << "x" << example_image.rows << std::endl;
@@ -465,8 +508,13 @@ int main(int argc, char **argv) {
      * performance.
      */
     timer(correlation_tracker_update_large, "dlib correlation tracker update (large)");
+    timer(opencv_kcf_tracker_update_large, "OpenCV KCF tracker update (large)");
+    timer(opencv_medianflow_tracker_update_large, "OpenCV medianflow tracker update (large)");
+
     if (do_small_face_tests) {
         timer(correlation_tracker_update_small, "dlib correlation tracker update (small)");
+        timer(opencv_kcf_tracker_update_small, "OpenCV KCF tracker update (small)");
+        timer(opencv_medianflow_tracker_update_small, "OpenCV medianflow tracker update (small)");
     }
 
     // Slow operations

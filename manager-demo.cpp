@@ -13,6 +13,7 @@
 #include "imagelogger.h"
 #include "facedetector.h"
 #include "manager.h"
+#include "util.h"
 #include "demo-util.h"
 
 
@@ -46,17 +47,6 @@ void usage() {
             << std::endl;
     std::cout << "Usage: <input filename> <output filename> [method] [[name face-image-filename]+]" << std::endl;
     std::cout << "Valid methods: NONE, CONTOURS, MSE, MSE_WITH_BLUR, DIFF, DIFF_WITH_BLUR" << std::endl;
-}
-
-/*
- * Rectangle conversion functions from https://stackoverflow.com/questions/34871740/convert-opencvs-rect-to-dlibs-rectangle
- */
-static cv::Rect dlibRectangleToOpenCV(dlib::rectangle r) {
-    return cv::Rect(cv::Point2i(r.left(), r.top()), cv::Point2i(r.right() + 1, r.bottom() + 1));
-}
-
-static dlib::rectangle openCVRectToDlib(cv::Rect r) {
-    return dlib::rectangle((long) r.tl().x, (long) r.tl().y, (long) r.br().x - 1, (long) r.br().y - 1);
 }
 
 int main(int argc, char **argv) {
