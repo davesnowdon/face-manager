@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <cstring>
 #include <opencv2/opencv.hpp>
+#include <opencv2/objdetect.hpp>
 
 #include <dlib/opencv.h>
 #include <dlib/dnn.h>
@@ -124,6 +125,10 @@ dlib::correlation_tracker tracker_large;
 dlib::correlation_tracker tracker_small;
 
 double tracker_confidence_result;
+
+cv::CascadeClassifier faceCascade;
+
+std::vector<cv::Rect> faces_result;
 
 // check cost of call via function pointer
 void no_op() {
@@ -261,6 +266,24 @@ void detect_faces_small() {
     std::vector<dlib::rectangle> faceRects = face_detector(example_small_dlib);
 }
 
+void detect_faces_opencv_large() {
+    /*
+     * Using a global vector here to try and prevent the compile from optimising away the call.
+     * Expectation that cost of std::vector.clear() should be small relative to the cost of face detection.
+     */
+    faces_result.clear();
+    faceCascade.detectMultiScale(example_greyscale, faces_result, 1.2, 2);
+}
+
+void detect_faces_opencv_small() {
+    /*
+     * Using a global vector here to try and prevent the compile from optimising away the call.
+     * Expectation that cost of std::vector.clear() should be small relative to the cost of face detection.
+     */
+    faces_result.clear();
+    faceCascade.detectMultiScale(example_small_greyscale, faces_result, 1.2, 2);
+}
+
 void face_landmarks_large() {
     landmarks_result = landmark_detector(example_dlib, face_bounds_large);
 }
@@ -322,6 +345,11 @@ int main(int argc, char **argv) {
     // DNN used for face recognition
     dlib::deserialize("models/dlib_face_recognition_resnet_model_v1.dat") >> face_metrics_net;
 
+    if (!faceCascade.load("/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_default.xml")) {
+        std::cerr << "Error loading face cascade" << std::endl;
+        return 1;
+    }
+
     /*
      * Setup test data
      */
@@ -352,6 +380,9 @@ int main(int argc, char **argv) {
     }
     face_bounds_large = faceRectsLarge[0];
 
+    /*
+     * dlib needs faces to be about 80x80 pixels in order to detect them
+     */
     bool do_small_face_tests = true;
     std::vector<dlib::rectangle> faceRectsSmall = face_detector(example_small_dlib);
     if (0 == faceRectsSmall.size()) {
@@ -417,8 +448,7 @@ int main(int argc, char **argv) {
     timer(sum_small, "Sum (small)");
     timer(convert_dlib_large, "Convert image to dlib (large)");
     timer(convert_dlib_small, "Convert image to dlib (small)");
-    timer(detect_faces_large, "Detect faces (large)");
-    timer(detect_faces_small, "Detect faces (small)");
+
     timer(face_landmarks_large, "Face landmarks (large)");
     if (do_small_face_tests) {
         timer(face_landmarks_small, "Face landmarks (small)");
@@ -427,7 +457,8 @@ int main(int argc, char **argv) {
     if (do_small_face_tests) {
         timer(extract_face_chip_small, "Extract face chip (small)");
     }
-    timer(compute_face_descriptor, "Compute face descriptor");
+    timer(compute_face_descriptor, "Face descriptor");
+
 
     /*
      * These only time a single frame update so they are not great overall tests of tracker
@@ -437,6 +468,12 @@ int main(int argc, char **argv) {
     if (do_small_face_tests) {
         timer(correlation_tracker_update_small, "dlib correlation tracker update (small)");
     }
+
+    // Slow operations
+    timer(detect_faces_large, "dlib detect faces (large)");
+    timer(detect_faces_small, "dlib detect faces (small)");
+    timer(detect_faces_opencv_large, "OpenCV detect faces (large)");
+    timer(detect_faces_opencv_small, "OpenCV detect faces (small)");
 
     return 0;
 }
