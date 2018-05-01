@@ -141,9 +141,9 @@ cv::Ptr<cv::Tracker> medianflow_tracker_large = cv::TrackerMedianFlow::create();
 
 cv::Ptr<cv::Tracker> medianflow_tracker_small = cv::TrackerMedianFlow::create();
 
-cv::Rect opencv_tracker_roi_large;
+cv::Rect2d opencv_tracker_roi_large;
 
-cv::Rect opencv_tracker_roi_small;
+cv::Rect2d opencv_tracker_roi_small;
 
 // check cost of call via function pointer
 void no_op() {
@@ -347,8 +347,8 @@ void opencv_medianflow_tracker_update_small() {
 }
 
 /*
- * Time an operation specified via a function pointer. 
- * We assume that that the time taken to call the function whilst non-zero is small enough to 
+ * Time an operation specified via a function pointer.
+ * We assume that that the time taken to call the function whilst non-zero is small enough to
  * not greatly affect the timings.
  */
 void timer(void(*operation)(), const char *title) {
