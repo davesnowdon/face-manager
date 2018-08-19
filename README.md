@@ -6,6 +6,13 @@ The tracker will attempt to recognise individuals so if a person leaves the came
 they should be recognised as having been seen before even if their identity is not
 known.
 
+## Building
+
+    mkdir -p build/x86_64
+    cd build/x86_64
+    cmake -D CMAKE_BUILD_TYPE=Release -D USE_AVX_INSTRUCTIONS=1 ../..
+    make
+
 ## Demo
 This accepts an input video and a list of known people and produces an output video
 annotated with the current frame rate (calculated using an exponential moving average),
