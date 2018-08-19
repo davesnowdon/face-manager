@@ -19,7 +19,10 @@
 
 #include "util.h"
 
+// TODO make the number of iterations configurable
 int const TEST_ITERATIONS = 10000;
+int const TEST_SLOW_ITERATIONS = 1000;
+
 int const TEST_IMAGE_WIDTH = 500;
 
 int const THRESHOLD_MIN = 127;
@@ -351,14 +354,14 @@ void opencv_medianflow_tracker_update_small() {
  * We assume that that the time taken to call the function whilst non-zero is small enough to
  * not greatly affect the timings.
  */
-void timer(void(*operation)(), const char *title) {
+void timer(const int num_iterations, void(*operation)(), const char *title) {
     std::cout << "Start: " << title << std::endl;
     double start_time = (double) cv::getTickCount();
-    for (int i = 0; i < TEST_ITERATIONS; ++i) {
+    for (int i = 0; i < num_iterations; ++i) {
         operation();
     }
     double end_time = (double) cv::getTickCount();
-    double operation_time = (end_time - start_time) / (cv::getTickFrequency() * TEST_ITERATIONS);
+    double operation_time = (end_time - start_time) / (cv::getTickFrequency() * num_iterations);
     std::cout << "End: " << title << " : " << operation_time << " seconds" << std::endl;
 }
 
@@ -458,70 +461,70 @@ int main(int argc, char **argv) {
 
     std::cout << "Size " << example_image.cols << "x" << example_image.rows << std::endl;
     std::cout << "Small size " << example_small_image.cols << "x" << example_small_image.rows << std::endl;
-    std::cout << "Testing with " << TEST_ITERATIONS << " iterations" << std::endl;
+    std::cout << "Testing with " << TEST_ITERATIONS << " iterations, and " << TEST_SLOW_ITERATIONS << " iterations for slow ops" << std::endl;
 
     /*
      * Run benchmarks
      */
-    timer(no_op, "Empty function");
-    timer(resize_image, "Resize image");
-    timer(resize_then_greyscale, "Resize then greyscale image");
-    timer(greyscale_then_resize, "Greyscale then resize image");
-    timer(blur_large, "Blur image (large)");
-    timer(blur_small, "Blur image (small)");
-    timer(frame_difference_large, "Frame difference (large)");
-    timer(frame_difference_small, "Frame difference (small)");
-    timer(threshold_large, "Threshold (large)");
-    timer(threshold_small, "Threshold (small)");
-    timer(dilate_large, "Dilate (large)");
-    timer(dilate_small, "Dilate (small)");
-    timer(erode_large, "Erode (large)");
-    timer(erode_small, "Erode (small)");
-    timer(find_contours_large, "Find contours (large)");
-    timer(find_contours_small, "Find contours (small)");
-    timer(norm2_large, "Norm2 (large)");
-    timer(norm2_small, "Norm2 (small)");
-    timer(convert_to_float_large, "Convert to float (large)");
-    timer(convert_to_float_small, "Convert to float (small)");
-    timer(accumulate_weighted_large, "Accumulate (large)");
-    timer(accumulate_weighted_small, "Accumulate (small)");
-    timer(bitwise_and_large, "Bitwise and (large)");
-    timer(bitwise_and_small, "Bitwise and (small)");
-    timer(sum_large, "Sum (large)");
-    timer(sum_small, "Sum (small)");
-    timer(convert_dlib_large, "Convert image to dlib (large)");
-    timer(convert_dlib_small, "Convert image to dlib (small)");
+    timer(TEST_ITERATIONS, no_op, "Empty function");
+    timer(TEST_ITERATIONS, resize_image, "Resize image");
+    timer(TEST_ITERATIONS, resize_then_greyscale, "Resize then greyscale image");
+    timer(TEST_ITERATIONS, greyscale_then_resize, "Greyscale then resize image");
+    timer(TEST_ITERATIONS, blur_large, "Blur image (large)");
+    timer(TEST_ITERATIONS, blur_small, "Blur image (small)");
+    timer(TEST_ITERATIONS, frame_difference_large, "Frame difference (large)");
+    timer(TEST_ITERATIONS, frame_difference_small, "Frame difference (small)");
+    timer(TEST_ITERATIONS, threshold_large, "Threshold (large)");
+    timer(TEST_ITERATIONS, threshold_small, "Threshold (small)");
+    timer(TEST_ITERATIONS, dilate_large, "Dilate (large)");
+    timer(TEST_ITERATIONS, dilate_small, "Dilate (small)");
+    timer(TEST_ITERATIONS, erode_large, "Erode (large)");
+    timer(TEST_ITERATIONS, erode_small, "Erode (small)");
+    timer(TEST_ITERATIONS, find_contours_large, "Find contours (large)");
+    timer(TEST_ITERATIONS, find_contours_small, "Find contours (small)");
+    timer(TEST_ITERATIONS, norm2_large, "Norm2 (large)");
+    timer(TEST_ITERATIONS, norm2_small, "Norm2 (small)");
+    timer(TEST_ITERATIONS, convert_to_float_large, "Convert to float (large)");
+    timer(TEST_ITERATIONS, convert_to_float_small, "Convert to float (small)");
+    timer(TEST_ITERATIONS, accumulate_weighted_large, "Accumulate (large)");
+    timer(TEST_ITERATIONS, accumulate_weighted_small, "Accumulate (small)");
+    timer(TEST_ITERATIONS, bitwise_and_large, "Bitwise and (large)");
+    timer(TEST_ITERATIONS, bitwise_and_small, "Bitwise and (small)");
+    timer(TEST_ITERATIONS, sum_large, "Sum (large)");
+    timer(TEST_ITERATIONS, sum_small, "Sum (small)");
+    timer(TEST_ITERATIONS, convert_dlib_large, "Convert image to dlib (large)");
+    timer(TEST_ITERATIONS, convert_dlib_small, "Convert image to dlib (small)");
 
-    timer(face_landmarks_large, "Face landmarks (large)");
+    timer(TEST_ITERATIONS, face_landmarks_large, "Face landmarks (large)");
     if (do_small_face_tests) {
-        timer(face_landmarks_small, "Face landmarks (small)");
+        timer(TEST_ITERATIONS, face_landmarks_small, "Face landmarks (small)");
     }
-    timer(extract_face_chip_large, "Extract face chip (large)");
+    timer(TEST_ITERATIONS, extract_face_chip_large, "Extract face chip (large)");
     if (do_small_face_tests) {
-        timer(extract_face_chip_small, "Extract face chip (small)");
+        timer(TEST_ITERATIONS, extract_face_chip_small, "Extract face chip (small)");
     }
-    timer(compute_face_descriptor, "Face descriptor");
+    timer(TEST_ITERATIONS, compute_face_descriptor, "Face descriptor");
 
 
     /*
      * These only time a single frame update so they are not great overall tests of tracker
      * performance.
      */
-    timer(correlation_tracker_update_large, "dlib correlation tracker update (large)");
-    timer(opencv_kcf_tracker_update_large, "OpenCV KCF tracker update (large)");
-    timer(opencv_medianflow_tracker_update_large, "OpenCV medianflow tracker update (large)");
+    timer(TEST_ITERATIONS, correlation_tracker_update_large, "dlib correlation tracker update (large)");
+    timer(TEST_ITERATIONS, opencv_kcf_tracker_update_large, "OpenCV KCF tracker update (large)");
+    timer(TEST_ITERATIONS, opencv_medianflow_tracker_update_large, "OpenCV medianflow tracker update (large)");
 
     if (do_small_face_tests) {
-        timer(correlation_tracker_update_small, "dlib correlation tracker update (small)");
-        timer(opencv_kcf_tracker_update_small, "OpenCV KCF tracker update (small)");
-        timer(opencv_medianflow_tracker_update_small, "OpenCV medianflow tracker update (small)");
+        timer(TEST_ITERATIONS, correlation_tracker_update_small, "dlib correlation tracker update (small)");
+        timer(TEST_ITERATIONS, opencv_kcf_tracker_update_small, "OpenCV KCF tracker update (small)");
+        timer(TEST_ITERATIONS, opencv_medianflow_tracker_update_small, "OpenCV medianflow tracker update (small)");
     }
 
     // Slow operations
-    timer(detect_faces_large, "dlib detect faces (large)");
-    timer(detect_faces_small, "dlib detect faces (small)");
-    timer(detect_faces_opencv_large, "OpenCV detect faces (large)");
-    timer(detect_faces_opencv_small, "OpenCV detect faces (small)");
+    timer(TEST_SLOW_ITERATIONS, detect_faces_large, "dlib detect faces (large)");
+    timer(TEST_SLOW_ITERATIONS, detect_faces_small, "dlib detect faces (small)");
+    timer(TEST_SLOW_ITERATIONS, detect_faces_opencv_large, "OpenCV detect faces (large)");
+    timer(TEST_SLOW_ITERATIONS, detect_faces_opencv_small, "OpenCV detect faces (small)");
 
     return 0;
 }
