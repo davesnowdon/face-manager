@@ -14,6 +14,7 @@
 #include <dlib/matrix.h>
 #include <dlib/dnn.h>
 #include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/image_transforms.h>
 
 // From dnn_face_recognition_ex.cpp
 // ----------------------------------------------------------------------------------------

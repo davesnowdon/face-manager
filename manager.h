@@ -209,7 +209,7 @@ private:
     int tracker_horizontal_margin_ = 10;
     int tracker_vertical_margin_ = 20;
 
-    // number of frames between each run of the trackers. 1 means every frame
+    // number of frames between each run of the face detector. 1 means every frame
     int detector_frame_interval_ = 5;
 };
 
