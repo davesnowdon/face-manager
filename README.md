@@ -44,6 +44,15 @@ get a feel for how expensive the various operations are on a desktop and Raspber
 
     ./micro-benchmarks <EXAMPLE_IMAGE_WITH_FACE>
 
+There are some micro benchmark results for my desktop (x86_64 with nvidia GTX 1080 GPU) and a Raspberry Pi 3 in benchmark-results.
+I plan to add results for the Raspberry Pi Zero soon.
+The results should be taken with a large grain of salt and there are several things that should be improved before they are taken too seriously:
+* Running at the large resolutions caused swapping on the Pi3 so the results are unlikely to be pure CPU
+* The benchmarks were not all run at the same time so there may be some slight variation in performance.
+* The tracker benchmarks were run repeatedly on the same patch - it would be more realistic to run them against different patches and over several frames.
+
+Once again, please don't take the exact values too seriously. They are just a guide to the cost of the operations
+
 ## Tests
 Tests use [Catch2](https://github.com/catchorg/Catch2)
 
