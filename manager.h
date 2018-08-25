@@ -158,6 +158,20 @@ public:
     // find a person using the local ID
     std::shared_ptr<Person> findPerson(int local_id) const;
 
+    /*
+     * get / set how often detectors are run
+     */
+    int detectorFrameInterval() const {
+        return detector_frame_interval_;
+    }
+
+    void detectorFrameInterval(int interval) {
+        detector_frame_interval_ = interval;
+    }
+
+    /*
+     * Clear current state but not set of known people
+     */
     void reset();
 
 private:
@@ -167,7 +181,7 @@ private:
 
     /*
      * Compute a face descriptor from a face rectangle. Using jitter will compute a mean
-     * of multiple perturbed versions of the image (minor changes in position, rotation and left/rigth flip)
+     * of multiple perturbed versions of the image (minor changes in position, rotation and left/right flip)
      * which may give better recognition results but which is slower so we probably don't
      * want to do this every time we are testing a potentially unknown face.
      */

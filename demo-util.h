@@ -16,6 +16,8 @@
 enum MotionMethod {
     MOTION_ALWAYS,   // always "detect" motion, used for comparison
     MOTION_NEVER,    // never detect motion, used to allow us to see cost of reading video with no processing overhead
+    MOTION_EVERY_OTHER, // indicates motion every other frame
+    MOTION_EVERY_TEN, // indicates motion every 10 frames
     MOTION_CONTOURS, // Use the PyImageSearch method based on contours
     MOTION_MSE,      // Use mean squared error
     MOTION_MSE_WITH_BLUR, // Use mean squared error after blurring

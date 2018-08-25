@@ -18,6 +18,10 @@ MotionDetector *motionDetectorFactory(MotionMethod method) {
             return new ConstantMotionDetector(true);
         case MOTION_NEVER:
             return new ConstantMotionDetector(false);
+        case MOTION_EVERY_OTHER:
+            return new FrameSkipMotionDetector(2);
+        case MOTION_EVERY_TEN:
+            return new FrameSkipMotionDetector(10);
         case MOTION_CONTOURS:
             return new ContourMotionDetector(MOTION_WIDTH, MOTION_CONTOUR_MIN_AREA);
         case MOTION_MSE:
@@ -47,6 +51,10 @@ MotionMethod motionMethodFromString(std::string method_name) {
         return MOTION_ALWAYS;
     } else if (method_name == "NEVER") {
         return MOTION_NEVER;
+    } else if (method_name == "EVERY2") {
+        return MOTION_EVERY_OTHER;
+    } else if (method_name == "EVERY10") {
+        return MOTION_EVERY_TEN;
     } else if (method_name == "CONTOURS") {
         return MOTION_CONTOURS;
     } else if (method_name == "MSE") {
@@ -70,6 +78,10 @@ std::string motionMethodToString(MotionMethod method) {
             return "ALWAYS";
         case MOTION_NEVER:
             return "NEVER";
+        case MOTION_EVERY_OTHER:
+            return "EVERY2";
+        case MOTION_EVERY_TEN:
+            return "EVERY10";
         case MOTION_CONTOURS:
             return "CONTOURS";
         case MOTION_MSE:

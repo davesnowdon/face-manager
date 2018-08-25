@@ -62,9 +62,34 @@ private:
     bool detect_motion_result_;
 };
 
+/**
+ * Does not detect motion, just signals motion every specified number of frames to reduce overall processing time
+ */
+class FrameSkipMotionDetector : public MotionDetector {
+public:
+    FrameSkipMotionDetector(bool frame_skip_count) {
+        frame_skip_count_ = frame_skip_count;
+        frame_count_ = 0;
+    }
+
+    virtual int numInitFrames() {
+        return 0;
+    }
+
+    virtual void initFrame(cv::Mat frame) {
+    }
+
+    virtual bool detectMotion(cv::Mat frame) {
+        return (++frame_count_ % frame_skip_count_) == 0;
+    }
+
+private:
+    int frame_skip_count_;
+    int frame_count_;
+};
 
 /**
- * Based on algoritm described in https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+ * Based on algorithm described in https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
  */
 class ContourMotionDetector : public MotionDetector {
 public:
