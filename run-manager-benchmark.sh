@@ -10,13 +10,11 @@ declare -a videoFile=("../test-data/emptyroom1.mp4"
                       "../test-data/lightingchange2.mp4"
                       "../test-data/movinghuman1.mp4"
                       "../test-data/movinghuman2.mp4"
-                      "../test-data/movinghuman3.mp4"
                       "../test-data/movinghuman4.mp4"
                       "../test-data/stillhuman1.mp4"
                       "../test-data/street1.mp4"
                       "../test-data/street2.mp4"
                       "../test-data/street3.mp4"
-                      "../test-data/street4.mp4"
                       "../test-data/street5.mp4"
                       "../test-data/multi-face.mov")
 
