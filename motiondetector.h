@@ -67,7 +67,7 @@ private:
  */
 class FrameSkipMotionDetector : public MotionDetector {
 public:
-    FrameSkipMotionDetector(bool frame_skip_count) {
+    FrameSkipMotionDetector(int frame_skip_count) {
         frame_skip_count_ = frame_skip_count;
         frame_count_ = 0;
     }
