@@ -23,6 +23,27 @@
 #include <dlib/image_processing.h>
 #include <dlib/image_transforms.h>
 
+enum ProcessingType {
+    NAIVE,   // Use a naive approach that runs face detection every N frames
+    MANAGER, // Use the face manager which uses a mix of detection and tracking
+    NONE     // Do no further processing so we can isolate the cost of doing only motion detection
+};
+
+char const*
+processingTypeToString(ProcessingType processingType) {
+    switch (processingType) {
+        case ProcessingType::NONE:
+            return "NONE";
+
+        case ProcessingType::NAIVE:
+            return "NAIVE";
+
+        case ProcessingType::MANAGER:
+            return "MANAGER";
+        default:
+            return "";
+    }
+}
 
 void usage() {
     std::cout << "Usage: <filename> <iterations> [method]" << std::endl;
@@ -31,7 +52,7 @@ void usage() {
 
 int
 runTrial(MotionMethod method, int numIterations, char *videoFilename, bool enable_logging, bool enable_output,
-        FaceDetector &faceDetector, Manager *manager) {
+         ProcessingType processingType, FaceDetector &faceDetector, Manager *manager) {
     if (enable_output) {
         std::cout << "Start: " << motionMethodToString(method) << ", logging enabled " << enable_logging << std::endl;
     }
@@ -98,35 +119,44 @@ runTrial(MotionMethod method, int numIterations, char *videoFilename, bool enabl
             }
 
             if (moved) {
-                // Want to compare performance using Manager with naive approach
-                if (manager) {
-                    manager->newFrame(frameCount, frame);
+                switch (processingType) {
+                    case ProcessingType::NONE:
+                        break;
 
-                } else {
-                    // Convert OpenCV image format to Dlib's image format
-                    dlib::cv_image <dlib::bgr_pixel> frame_dlib(frame);
+                    case ProcessingType::NAIVE:
+                        if (!manager) {
+                            // Convert OpenCV image format to Dlib's image format
+                            dlib::cv_image<dlib::bgr_pixel> frame_dlib(frame);
 
-                    // Detect faces in the image
-                    std::vector <dlib::rectangle> faceRects = faceDetector.detectFaces(frame_dlib);
-                    if (logger.debugEnabled()) {
-                        logger.debug("Number of faces detected: " + std::to_string(faceRects.size()));
-                    }
+                            // Detect faces in the image
+                            std::vector<dlib::rectangle> faceRects = faceDetector.detectFaces(frame_dlib);
+                            if (logger.debugEnabled()) {
+                                logger.debug("Number of faces detected: " + std::to_string(faceRects.size()));
+                            }
 
-                    // These are the transformed and extracted faces
-                    std::vector <dlib::matrix<dlib::rgb_pixel>> faces = faceDetector.extractFaceImages(frame_dlib,
-                                                                                                       faceRects);
+                            // These are the transformed and extracted faces
+                            std::vector<dlib::matrix<dlib::rgb_pixel>> faces = faceDetector.extractFaceImages(
+                                    frame_dlib,
+                                    faceRects);
 
-                    if (faces.size() > 0) {
-                        /*
-                         * This call asks the DNN to convert each face image in faces into a 128D vector.
-                         * In this 128D vector space, images from the same person will be close to each other
-                         * but vectors from different people will be far apart.  So we can use these vectors to
-                         * identify if a pair of images are from the same person or from different people.
-                         */
-                        std::vector <dlib::matrix<float, 0, 1>> face_descriptors = faceDetector.getFaceDescriptors(
-                                faces);
+                            if (faces.size() > 0) {
+                                /*
+                                 * This call asks the DNN to convert each face image in faces into a 128D vector.
+                                 * In this 128D vector space, images from the same person will be close to each other
+                                 * but vectors from different people will be far apart.  So we can use these vectors to
+                                 * identify if a pair of images are from the same person or from different people.
+                                 */
+                                std::vector<dlib::matrix<float, 0, 1>> face_descriptors = faceDetector.getFaceDescriptors(
+                                        faces);
+                            }
+                        }
+                        break;
 
-                    }
+                    case ProcessingType::MANAGER:
+                        if (manager) {
+                            manager->newFrame(frameCount, frame);
+                        }
+                        break;
                 }
             }
 
@@ -140,11 +170,13 @@ runTrial(MotionMethod method, int numIterations, char *videoFilename, bool enabl
     float fps = cv::getTickFrequency() / (totalTime / (frameCount * numIterations));
     FaceCounters counters = faceDetector.getCounters();
     if (enable_output) {
-        std::cout << "File, method, Manager?, Detect inteval, #frames, FPS, #motion frames, #face detect, #face extract, #face descriptor" <<
-                  std::endl;
+        std::cout
+                << "File, method, Manager?, Detect inteval, #frames, FPS, #motion frames, #face detect, #face extract, #face descriptor"
+                <<
+                std::endl;
         std::cout << "End: " << videoFilename << ", "
                   << motionMethodToString(method)
-                  << ", " << ((nullptr == manager) ? "NAIVE" : "MANAGER")
+                  << ", " << processingTypeToString(processingType)
                   << ", " << ((nullptr == manager) ? "" : std::to_string(manager->detectorFrameInterval()))
                   << ", " << frameCount << ", " << fps << ", " << motionCount
                   << ", " << counters.detect_count_
@@ -158,14 +190,15 @@ runTrial(MotionMethod method, int numIterations, char *videoFilename, bool enabl
 
 
 int
-runMethods(int numIterations, char *videoFilename, FaceDetector &faceDetector, Manager *manager) {
+runMethods(int numIterations, char *videoFilename, ProcessingType processingType, FaceDetector &faceDetector,
+           Manager *manager) {
     MotionMethod methods[] = {MOTION_ALWAYS, MOTION_NEVER,
                               MOTION_EVERY_OTHER, MOTION_EVERY_TEN,
                               MOTION_CONTOURS,
                               MOTION_MSE, MOTION_MSE_WITH_BLUR,
                               MOTION_DIFF, MOTION_DIFF_WITH_BLUR};
     for (const MotionMethod method : methods) {
-        int result = runTrial(method, numIterations, videoFilename, false, true, faceDetector, manager);
+        int result = runTrial(method, numIterations, videoFilename, false, true, processingType, faceDetector, manager);
         if (0 != result) {
             std::cerr << "Stopping early due to error" << std::endl;
             return result;
@@ -189,7 +222,7 @@ int main(int argc, char **argv) {
 
     // Run a single iteration to "warm up" the system
     std::cout << "Start warm up" << std::endl;
-    runTrial(MOTION_ALWAYS, 1, videoFilename, false, false, faceDetector, nullptr);
+    runTrial(MOTION_ALWAYS, 1, videoFilename, false, false, ProcessingType::NAIVE, faceDetector, nullptr);
     std::cout << "Warm up done" << std::endl;
 
     /*
@@ -200,18 +233,23 @@ int main(int argc, char **argv) {
         std::string methodName = argv[3];
         MotionMethod method = motionMethodFromString(methodName);
         // TODO add manager
-        return runTrial(method, numIterations, videoFilename, true, true, faceDetector, nullptr);
+        return runTrial(method, numIterations, videoFilename, true, true, ProcessingType::NAIVE, faceDetector, nullptr);
 
     } else {
         // run complete set of trials
-        std::cout << "Running all methods without manager" << std::endl;
-        int result = runMethods(numIterations, videoFilename, faceDetector, nullptr);
+        std::cout << "Running all methods using only motion detection" << std::endl;
+        int result = runMethods(numIterations, videoFilename, ProcessingType::NONE, faceDetector, nullptr);
+
+        if (0 == result) {
+            std::cout << "Running all methods using naive approach" << std::endl;
+            result = runMethods(numIterations, videoFilename, ProcessingType::NAIVE, faceDetector, nullptr);
+        }
 
         if (0 == result) {
             std::cout << "Running all methods with manager (interval 5)" << std::endl;
             Manager *manager = new Manager(faceDetector);
             manager->detectorFrameInterval(5);
-            result = runMethods(numIterations, videoFilename, faceDetector, manager);
+            result = runMethods(numIterations, videoFilename, ProcessingType::MANAGER, faceDetector, manager);
             delete manager;
         }
 
@@ -219,7 +257,7 @@ int main(int argc, char **argv) {
             std::cout << "Running all methods with manager (interval 10)" << std::endl;
             Manager *manager = new Manager(faceDetector);
             manager->detectorFrameInterval(10);
-            result = runMethods(numIterations, videoFilename, faceDetector, manager);
+            result = runMethods(numIterations, videoFilename, ProcessingType::MANAGER, faceDetector, manager);
             delete manager;
         }
 
