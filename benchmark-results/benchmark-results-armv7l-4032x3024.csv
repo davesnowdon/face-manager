@@ -31,10 +31,10 @@ Norm2 (large) , 0.0476453,0.0470956,0.0475951,0.0470913
 Norm2 (small) , 0.000680403,0.000677254,0.000680949,0.000677416
 OpenCV detect faces (large) , 5.3214,5.1851,5.06546,5.09622
 OpenCV detect faces (small) , 0.171616,0.168987,0.163056,0.164481
-OpenCV KCF tracker update (large) , 1294.94
-OpenCV KCF tracker update (small) , 0.312759
-OpenCV medianflow tracker update (large) , 2.93184
-OpenCV medianflow tracker update (small) , 1.96949
+OpenCV KCF tracker update (large) , 1294.94,1259.76,1440.66,1372.34
+OpenCV KCF tracker update (small) , 0.312759,0.313172,0.310173,0.313565
+OpenCV medianflow tracker update (large) , 2.93184,2.24415,3.07447,2.39259
+OpenCV medianflow tracker update (small) , 1.96949,2.02916,1.76022,1.87182
 Resize image , 0.165771,0.239533,0.248454,0.169036
 Resize then greyscale image , 0.167319,0.24153,0.250823,0.192689
 Sum (large) , 0.0210114,0.0209922,0.0210151,0.0210075
